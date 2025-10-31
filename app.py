@@ -1,3 +1,4 @@
+
 import streamlit as st
 from PIL import Image
 import time
@@ -5,7 +6,7 @@ import pandas as pd
 import cv2 
 import numpy as np
 import concurrent.futures
-import io  # Added for byte conversion
+import io 
 
 # Import all the functions from backend pipeline files
 from pipeline.pest_pipeline import (
@@ -20,17 +21,14 @@ from pipeline.disease_pipeline import (
     run_health_classification,
     run_disease_classification
 )
-
-# -----------------------------------------------------------------
-# --- Worker Functions for Parallel Processing ---
-# (These are now called sequentially, but the functions are fine)
-# -----------------------------------------------------------------
+# Worker Functions for Parallel Processing
 
 def run_pest_pipeline(image_batch, model):
     """Runs the pest detection logic and returns the results."""
     try:
-        total_pest_counts, annotated_images = run_pest_detection_batch(image_batch, model)
-        return total_pest_counts, annotated_images
+        # This function now returns images_by_pest (a dict)
+        total_pest_counts, images_by_pest = run_pest_detection_batch(image_batch, model)
+        return total_pest_counts, images_by_pest
     except Exception as e:
         return None, f"Error in Pest Pipeline: {e}"
 
@@ -63,17 +61,29 @@ def run_disease_pipeline(image_batch, dino_model, dino_processor, dino_device, c
     except Exception as e:
         return None, f"Error in Disease Pipeline: {e}"
 
-# -----------------------------------------------------------------
 # Streamlit App Configuration
-# -----------------------------------------------------------------
 st.set_page_config(layout="wide", page_title="AGS Farmhealth analyser Tool")
-st.title("AGS Farm Health Analyser") # Added emoji
 
-# -----------------------------------------------------------------
-# --- CUSTOM CSS STYLING ---
-# -----------------------------------------------------------------
+col1, col2 = st.columns([1, 6]) 
+
+with col1:
+    st.image("assets/logo.jpeg", use_container_width=True) 
+
+with col2:
+    st.title("AGS Farm Health Analyser")
+    st.write("Upload a batch of images to run Pest/ETL and Crop/Disease analysis.")
+
+
+# CUSTOM CSS STYLING 
 st.markdown("""
     <style>
+    
+    /* --- Main App Background --- */
+    [data-testid="stAppViewContainer"] {
+        background-color: #F0F4F0; /* A light gray background */
+    }
+    
+
     /* --- Main Theme Colors --- */
     :root {
         --primary-color: #4CAF50; /* Bright, professional green */
@@ -83,7 +93,7 @@ st.markdown("""
         --light-gray: #F5F5F5;
         --border-color: #E0E0E0;
     }
-
+    /* ... (rest of your CSS is unchanged) ... */
     /* --- General Page --- */
     .stApp {
         color: var(--text-color);
@@ -132,6 +142,8 @@ st.markdown("""
         font-weight: 600;
     }
     
+    
+    
     /* --- Download Button (make it smaller) --- */
     div.stDownloadButton > button {
         background-color: #F0F0F0;
@@ -146,12 +158,11 @@ st.markdown("""
         background-color: #E0E0E0;
         border-color: #999;
     }
+
+    
     
     </style>
     """, unsafe_allow_html=True)
-# -----------------------------------------------------------------
-
-st.write("Upload a batch of images to run Pest/ETL and Crop/Disease analysis.")
 
 # File Uploader
 uploaded_files = st.file_uploader(
@@ -160,58 +171,46 @@ uploaded_files = st.file_uploader(
     accept_multiple_files=True
 )
 
-# -----------------------------------------------------------------
-# Initialize Session State
-# -----------------------------------------------------------------
 if 'pest_counts' not in st.session_state:
     st.session_state.pest_counts = {}
 if 'etl_inputs_ready' not in st.session_state:
     st.session_state.etl_inputs_ready = False
-if 'annotated_images' not in st.session_state:
-    st.session_state.annotated_images = []
+if 'images_by_pest' not in st.session_state:
+    st.session_state.images_by_pest = {}
 if 'final_sorting_results' not in st.session_state:
     st.session_state.final_sorting_results = {}
-# --- KEYS TO PREVENT RE-LOADING ---
 if 'image_batch_with_names' not in st.session_state:
     st.session_state.image_batch_with_names = []
 if 'processed_filenames' not in st.session_state:
     st.session_state.processed_filenames = []
 
 
-# -----------------------------------------------------------------
 # Main Processing Logic
-# -----------------------------------------------------------------
 
 if uploaded_files:
     
     current_filenames = [f.name for f in uploaded_files]
     
-    # --- ONE-TIME-ONLY: Load images into memory ---
     if st.session_state.processed_filenames != current_filenames:
         
-        # --- RESET ALL RESULTS ---
         st.session_state.pest_counts = {}
         st.session_state.etl_inputs_ready = False
-        st.session_state.annotated_images = []
+        st.session_state.images_by_pest = {} 
         st.session_state.final_sorting_results = {}
         st.session_state.image_batch_with_names = []
         
-        # --- Run the slow Image.open() loop ---
         temp_image_batch = []
         with st.spinner(f"Loading {len(uploaded_files)} images..."):
             for uploaded_file in uploaded_files:
                 img = Image.open(uploaded_file)
                 temp_image_batch.append((uploaded_file.name, img.copy()))
         
-        # --- SAVE TO SESSION STATE ---
         st.session_state.image_batch_with_names = temp_image_batch
         st.session_state.processed_filenames = current_filenames
-        # No st.rerun() here, let the script continue to display thumbnails
     
     # --- ALWAYS: Display Thumbnails (fast) ---
     st.subheader(f"Uploaded {len(st.session_state.image_batch_with_names)} Image(s)")
     cols = st.columns(min(len(st.session_state.image_batch_with_names), 10))
-    # Read from session state, which is now populated
     for i, (name, img) in enumerate(st.session_state.image_batch_with_names):
         with cols[i % 10]:
             st.image(img, caption=name, width=100)
@@ -221,10 +220,9 @@ if uploaded_files:
     # --- Analysis Button (COMPUTATION ONLY) ---
     if st.button(f"Run Full Analysis on {len(uploaded_files)} Images", type="primary", use_container_width=True):
         
-        # Reset analysis results, but NOT the loaded images
         st.session_state.pest_counts = {}
         st.session_state.etl_inputs_ready = False
-        st.session_state.annotated_images = []
+        st.session_state.images_by_pest = {} # --- RESET new key ---
         st.session_state.final_sorting_results = {}
         
         with st.spinner("Loading analysis models... (first time might take a while)"):
@@ -236,28 +234,20 @@ if uploaded_files:
             st.error("One or more models failed to load. Cannot proceed.")
         else:
             
-            # -------------------------------------------------
-            # --- *** THIS IS THE FIX FOR MEMORY ERROR *** ---
             # --- SEQUENTIAL EXECUTION (To save memory) ---
-            # -------------------------------------------------
-            
             image_batch = st.session_state.image_batch_with_names
             
-            # Run Pest Pipeline First
             with st.spinner("Step 1/2: Running Pest analysis..."):
                 pest_result = run_pest_pipeline(image_batch, pest_model)
             
-            # Run Disease Pipeline Second
             with st.spinner("Step 2/2: Running Disease analysis..."):
                 disease_result = run_disease_pipeline(image_batch, dino_model, dino_processor, dino_device, clip_classifier)
             
-            # --- End of Fix ---
-
             # --- Unpack and SAVE results to session_state ---
             if pest_result[0] is not None:
-                total_pest_counts, annotated_images = pest_result
+                total_pest_counts, images_by_pest = pest_result # --- RENAMED variable ---
                 st.session_state.pest_counts = total_pest_counts
-                st.session_state.annotated_images = annotated_images
+                st.session_state.images_by_pest = images_by_pest # --- SAVE new structure ---
                 if total_pest_counts:
                     st.session_state.etl_inputs_ready = True
             else:
@@ -272,7 +262,7 @@ elif not uploaded_files and st.session_state.processed_filenames:
     # --- RESET IF FILES ARE CLEARED ---
     st.session_state.pest_counts = {}
     st.session_state.etl_inputs_ready = False
-    st.session_state.annotated_images = []
+    st.session_state.images_by_pest = {} # --- RESET new key ---
     st.session_state.final_sorting_results = {}
     st.session_state.image_batch_with_names = []
     st.session_state.processed_filenames = []
@@ -282,47 +272,59 @@ elif not uploaded_files and st.session_state.processed_filenames:
 # --- DISPLAY LOGIC (RUNS EVERY TIME) ---
 # -----------------------------------------------------------------
 
-if st.session_state.annotated_images or st.session_state.final_sorting_results:
+# --- UPDATED this condition ---
+if st.session_state.images_by_pest or st.session_state.final_sorting_results:
     
     col1, col2 = st.columns(2)
 
-    # --- BRANCH 1: Display Pest & ETL ---
+    # ---------------------------------------------------
+    # --- BRANCH 1: Display Pest & ETL (REWRITTEN) ---
+    # ---------------------------------------------------
     with col1:
-        st.header("🐜 Pest & ETL Analysis")
+        st.header("Pest & ETL Analysis")
         st.subheader("Pest Counts Found:")
         
         total_pest_counts = st.session_state.pest_counts
-        annotated_images = st.session_state.annotated_images
+        images_by_pest = st.session_state.images_by_pest
         
         if not total_pest_counts:
             st.warning("No pests detected in the batch.")
         else:
             st.dataframe(pd.DataFrame(total_pest_counts.items(), columns=['Pest', 'Total Count']), use_container_width=True)
         
-        if annotated_images:
+        if images_by_pest:
             st.subheader("Annotated Pest Images (Verification)")
-            with st.expander(f"Click to view {len(annotated_images)} images with detections", expanded=True):
-                
-                num_cols = 5 
-                cols = st.columns(num_cols)
-                for idx, (filename, img) in enumerate(annotated_images):
-                    with cols[idx % num_cols]:
-                        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                        st.image(img_rgb, caption=filename, use_container_width=True)
-                        
-                        _ , buf = cv2.imencode(".png", img)
-                        data_bytes = buf.tobytes()
-                        st.download_button(
-                            label="Download",
-                            data=data_bytes,
-                            file_name=f"annotated_{filename}.png",
-                            mime="image/png",
-                            key=f"pest_dl_{idx}"
-                        )
-
-    # --- BRANCH 2: Display Crop & Disease ---
+            
+            # Create tab names like "Aphid (3 images)"
+            pest_tab_names = [f"{pest_name} ({len(images)} images)" 
+                              for pest_name, images in images_by_pest.items()]
+            
+            pest_tabs = st.tabs(pest_tab_names)
+            
+            # Loop through the dictionary and tabs together
+            for i, (pest_name, images) in enumerate(images_by_pest.items()):
+                with pest_tabs[i]:
+                    # Now use the grid logic inside *this* tab
+                    num_cols = 5 
+                    cols = st.columns(num_cols)
+                    for idx, (filename, img) in enumerate(images):
+                        with cols[idx % num_cols]:
+                            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                            st.image(img_rgb, caption=filename, use_container_width=True)
+                            
+                            _ , buf = cv2.imencode(".png", img)
+                            data_bytes = buf.tobytes()
+                            st.download_button(
+                                label="Download",
+                                data=data_bytes,
+                                file_name=f"annotated_{filename}.png",
+                                mime="image/png",
+                                key=f"pest_dl_{pest_name}_{idx}" # Make key unique
+                            )
+        
+    # --- BRANCH 2: Display Crop & Disease (Unchanged) ---
     with col2:
-        st.header("🌿 Crop & Disease Sorting")
+        st.header("Crop & Disease Sorting")
         st.subheader("Image Sorting Results:")
         
         final_sorting_results = st.session_state.final_sorting_results
@@ -396,7 +398,7 @@ if st.session_state.annotated_images or st.session_state.final_sorting_results:
 # --- ETL Input Form (RUNS EVERY TIME) ---
 if st.session_state.get('etl_inputs_ready', False):
     st.markdown("---")
-    st.header("⚙️ Enter ETL Calculation Parameters")
+    st.header("Enter ETL Calculation Parameters")
     st.warning("Provide initial damage index (I), control cost (C), market price, and environmental factor (fev_con) for each detected pest.")
     etl_input_rows = []
     pest_counts = st.session_state.pest_counts
@@ -410,7 +412,6 @@ if st.session_state.get('etl_inputs_ready', False):
             fev_con = cols[3].number_input(f"Environmental Factor (fev_con) for {pest_name}", min_value=0.0, value=20.0, step=0.5, format="%.1f", key=f"fev_{pest_name}")
             etl_input_rows.append((pest_name, n_count, i_old, 0, c_cost, market_price, 0, 0, fev_con))
         
-        # Give the form submit button a primary color too
         submitted = st.form_submit_button("Calculate ETL", type="primary", use_container_width=True)
         
         if submitted:
