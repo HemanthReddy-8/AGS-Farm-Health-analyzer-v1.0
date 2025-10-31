@@ -67,7 +67,7 @@ def run_disease_pipeline(image_batch, dino_model, dino_processor, dino_device, c
 # Streamlit App Configuration
 # -----------------------------------------------------------------
 st.set_page_config(layout="wide", page_title="AGS Farmhealth analyser Tool")
-st.title("🚜 AGS Farm Health Analyser") # Added emoji
+st.title("AGS Farm Health Analyser") # Added emoji
 
 # -----------------------------------------------------------------
 # --- CUSTOM CSS STYLING ---
@@ -132,39 +132,6 @@ st.markdown("""
         font-weight: 600;
     }
     
-    /* --- Tabs --- */
-    [data-testid="stTabs"] button[role="tab"] {
-        color: #777;
-        font-weight: 500;
-    }
-    [data-testid="stTabs"] button[role="tab"][aria-selected="true"] {
-        color: var(--dark-green);
-        border-bottom: 3px solid var(--primary-color);
-        font-weight: 700;
-    }
-
-    /* --- Expander --- */
-    [data-testid="stExpander"] {
-        border: 1px solid var(--border-color);
-        border-radius: 10px;
-        overflow: hidden; /* Clips the summary border */
-    }
-    [data-testid="stExpander"] summary {
-        background-color: var(--light-gray);
-        color: var(--dark-green);
-        font-weight: 600;
-        border-radius: 10px 10px 0 0;
-        padding: 10px 15px;
-    }
-
-    /* --- ETL Form --- */
-    [data-testid="stForm"] {
-        border: 1px solid var(--border-color);
-        border-radius: 10px;
-        padding: 20px;
-        background-color: var(--light-green-bg);
-    }
-    
     /* --- Download Button (make it smaller) --- */
     div.stDownloadButton > button {
         background-color: #F0F0F0;
@@ -178,18 +145,6 @@ st.markdown("""
     div.stDownloadButton > button:hover {
         background-color: #E0E0E0;
         border-color: #999;
-    }
-
-    /* --- Image Captions --- */
-    .stImage figcaption {
-        font-size: 0.9em;
-        color: #555;
-    }
-    
-    /* --- Sidebar --- */
-    [data-testid="stSidebar"] {
-        background-color: var(--light-green-bg);
-        padding-top: 1rem;
     }
     
     </style>

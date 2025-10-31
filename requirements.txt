@@ -14,5 +14,3 @@ transformers
 clip-openai
 supervision
 numpy
-
-# use pip freeze > requirements.txt to install the updated packages
