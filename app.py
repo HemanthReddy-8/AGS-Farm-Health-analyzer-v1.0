@@ -60,6 +60,9 @@ def run_disease_pipeline(image_batch, dino_model, dino_processor, dino_device, c
         return final_sorting_results
     except Exception as e:
         return None, f"Error in Disease Pipeline: {e}"
+def reset_app():
+    # Set the file_uploader key to an empty list to clear it
+    st.session_state.file_uploader = []
 
 # Streamlit App Configuration
 st.set_page_config(layout="wide", page_title="AGS Farmhealth analyser Tool")
@@ -168,7 +171,8 @@ st.markdown("""
 uploaded_files = st.file_uploader(
     "Choose images...",
     type=['png', 'jpg', 'jpeg'],
-    accept_multiple_files=True
+    accept_multiple_files=True,
+    key="file_uploader"
 )
 
 if 'pest_counts' not in st.session_state:
@@ -433,6 +437,10 @@ if st.session_state.get('etl_inputs_ready', False):
                     if etl_fig:
                         st.subheader("Pest Severity Progression Over Time")
                         st.plotly_chart(etl_fig, use_container_width=True)
+
+# --- NEW: Reset Button ---
+st.sidebar.button("Clear All & Reset App", on_click=reset_app, use_container_width=True, type="secondary")
+# -------------------------
 
 # Add instructions or footer if needed
 st.sidebar.info("Upload multiple images and click 'Run Analysis'. Provide ETL parameters when prompted.")
