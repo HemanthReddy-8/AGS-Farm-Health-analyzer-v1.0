@@ -8,10 +8,9 @@ from PIL import Image
 import cv2
 import supervision as sv
 import numpy as np
+from collections import defaultdict
 
-# -----------------------------------------------------------------
-# PEST DETECTION (BRANCH 1 - PART 1)
-# -----------------------------------------------------------------
+# PEST DETECTION (BRANCH 1 - PART 1)-
 
 @st.cache_resource
 def load_pest_model():
@@ -90,24 +89,19 @@ def draw_boxes(pil_image, results):
     return annotated_frame
 
 
-# Make sure this is at the top of your pest_pipeline.py
-from collections import defaultdict
-
-# ... (other imports like load_pest_model, get_pests_from_results, draw_boxes) ...
-
 def run_pest_detection_batch(image_batch_with_names, pest_model):
     """
     Runs pest detection and returns counts AND a dictionary of images grouped by pest.
     """
     total_pest_counts = {}       # e.g., {'aphid': 5, 'thrip': 2}
     images_by_pest = defaultdict(list) # e.g., {'aphid': [('img1', img1_annotated), ...]}
-
+    
     # Cache to store annotated images (so we only draw boxes on each image once)
     annotated_image_cache = {}
 
     for filename, pil_image in image_batch_with_names:
         results = pest_model(pil_image) 
-
+        
         # This helper should return a list of all pests found, e.g., ['aphid', 'aphid', 'thrip']
         pests_found_in_image = get_pests_from_results(results) 
 
@@ -117,24 +111,24 @@ def run_pest_detection_batch(image_batch_with_names, pest_model):
         # 1. Update total counts (counts all instances)
         for pest in pests_found_in_image:
              total_pest_counts[pest] = total_pest_counts.get(pest, 0) + 1
-
+        
         # 2. Get the single annotated image
-        if filename not in annotated_image_cache:
-            annotated_image_cache[filename] = draw_boxes(pil_image, results)
-
-        annotated_cv2_img = annotated_image_cache[filename]
-
+        # Check cache first
+        if filename in annotated_image_cache:
+            annotated_cv2_img = annotated_image_cache[filename]
+        else:
+            # If not in cache, create, store, and use
+            annotated_cv2_img = draw_boxes(pil_image, results)
+            annotated_image_cache[filename] = annotated_cv2_img
+        
         # 3. Add this one image to the list for each *unique* pest found
         for pest_name in set(pests_found_in_image):
             images_by_pest[pest_name].append((filename, annotated_cv2_img))
-
+    
     # Return the counts and the new dictionary
     return total_pest_counts, images_by_pest
 
-# -----------------------------------------------------------------
 # ETL CALCULATION (BRANCH 1 - PART 2)
-# (This section had no errors and remains unchanged)
-# -----------------------------------------------------------------
 
 def calculate_value_loss(I, market_cost_per_kg):
     """Helper function for ETL calculation."""
