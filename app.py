@@ -328,8 +328,8 @@ if st.session_state.images_by_pest or st.session_state.final_sorting_results:
         
     # --- BRANCH 2: Display Crop & Disease (Unchanged) ---
     with col2:
-        st.header("Crop & Disease Sorting")
-        st.subheader("Image Sorting Results:")
+        st.header("Crop & Disease Analasys")
+        st.subheader("Image Analysis Results:")
         
         final_sorting_results = st.session_state.final_sorting_results
         
@@ -400,7 +400,7 @@ if st.session_state.images_by_pest or st.session_state.final_sorting_results:
                                             st.write(f"No images found for {disease_name}.")
 
 # --- ETL Input Form (RUNS EVERY TIME) ---
-if st.session_state.get('etl_inputs_ready', False):
+if st.session_state.get('etl_inputs', False):
     st.markdown("---")
     st.header("Enter ETL Calculation Parameters")
     st.warning("Provide initial damage index (I), control cost (C), market price, and environmental factor (fev_con) for each detected pest.")
