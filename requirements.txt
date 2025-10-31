@@ -1,0 +1,18 @@
+streamlit
+pandas
+plotly
+plotly-express
+torch
+torchvision
+torchaudio
+ultralytics
+opencv-python-headless
+Pillow
+scikit-learn
+matplotlib
+transformers
+clip-openai
+supervision
+numpy
+
+# use pip freeze > requirements.txt to install the updated packages
